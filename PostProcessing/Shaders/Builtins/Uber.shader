@@ -150,20 +150,11 @@ Shader "Hidden/PostProcessing/Uber"
                 #if BLOOM
                 half4 bloom = UpsampleTent(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy, _Bloom_Settings.x);
                 #else
-                half4 bloom = UpsampleBox(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy, _Bloom_Settings.x);
+                half4 bloom = UpsampleDual(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy / 2.0);
                 #endif
 
-                // UVs should be Distort(uv * _Bloom_DirtTileOffset.xy + _Bloom_DirtTileOffset.zw)
-                // but considering we use a cover-style scale on the dirt texture the difference
-                // isn't massive so we chose to save a few ALUs here instead in case lens distortion
-                // is active
-                half4 dirt = half4(SAMPLE_TEXTURE2D(_Bloom_DirtTex, sampler_Bloom_DirtTex, uvDistorted * _Bloom_DirtTileOffset.xy + _Bloom_DirtTileOffset.zw).rgb, 0.0);
-
                 // Additive bloom (artist friendly)
-                bloom *= _Bloom_Settings.y;
-                dirt *= _Bloom_Settings.z;
-                color += bloom * half4(_Bloom_Color, 1.0);
-                color += dirt * bloom;
+                color += bloom * _Bloom_Settings.y;
             }
             #endif
 
