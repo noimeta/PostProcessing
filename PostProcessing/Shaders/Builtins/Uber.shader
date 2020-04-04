@@ -6,7 +6,7 @@ Shader "Hidden/PostProcessing/Uber"
 
         #pragma multi_compile __ DISTORT
         #pragma multi_compile __ CHROMATIC_ABERRATION CHROMATIC_ABERRATION_LOW
-        #pragma multi_compile __ BLOOM BLOOM_LOW
+        #pragma multi_compile __ BLOOM BLOOM_LOW BLOOM_CUSTOM
         #pragma multi_compile __ VIGNETTE
         #pragma multi_compile __ GRAIN
         #pragma multi_compile __ FINALPASS
@@ -33,11 +33,13 @@ Shader "Hidden/PostProcessing/Uber"
 
         // Bloom
         TEXTURE2D_SAMPLER2D(_BloomTex, sampler_BloomTex);
-        TEXTURE2D_SAMPLER2D(_Bloom_DirtTex, sampler_Bloom_DirtTex);
         float4 _BloomTex_TexelSize;
+#if BLOOM || BLOOM_LOW
+		TEXTURE2D_SAMPLER2D(_Bloom_DirtTex, sampler_Bloom_DirtTex);
         float4 _Bloom_DirtTileOffset; // xy: tiling, zw: offset
+		half3 _Bloom_Color;
+#endif
         half3 _Bloom_Settings; // x: sampleScale, y: intensity, z: dirt intensity
-        half3 _Bloom_Color;
 
         // Chromatic aberration
         TEXTURE2D_SAMPLER2D(_ChromaticAberration_SpectralLut, sampler_ChromaticAberration_SpectralLut);
@@ -145,8 +147,13 @@ Shader "Hidden/PostProcessing/Uber"
 
             color.rgb *= autoExposure;
 
-            #if BLOOM || BLOOM_LOW
+            #if BLOOM || BLOOM_LOW || BLOOM_CUSTOM
             {
+				#if BLOOM_CUSTOM
+				half4 bloom = SAMPLE_TEXTURE2D(_BloomTex, sampler_BloomTex, uv);
+				color += _Bloom_Settings.y * bloom;
+				#else
+
                 #if BLOOM
                 half4 bloom = UpsampleTent(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy, _Bloom_Settings.x);
                 #else
@@ -164,6 +171,7 @@ Shader "Hidden/PostProcessing/Uber"
                 dirt *= _Bloom_Settings.z;
                 color += bloom * half4(_Bloom_Color, 1.0);
                 color += dirt * bloom;
+				#endif
             }
             #endif
 

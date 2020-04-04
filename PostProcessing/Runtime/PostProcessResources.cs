@@ -19,6 +19,7 @@ namespace UnityEngine.Rendering.PostProcessing
             /// The shader used for the bloom effect.
             /// </summary>
             public Shader bloom;
+            public Shader customBloom;
 
             /// <summary>
             /// The shader used for internal blit copies.

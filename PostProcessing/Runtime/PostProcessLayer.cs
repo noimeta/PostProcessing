@@ -1206,6 +1206,7 @@ namespace UnityEngine.Rendering.PostProcessing
             RenderEffect<LensDistortion>(context);
             RenderEffect<ChromaticAberration>(context);
             RenderEffect<Bloom>(context);
+            RenderEffect<CustomBloom>(context);
             RenderEffect<Vignette>(context);
             RenderEffect<Grain>(context);
 

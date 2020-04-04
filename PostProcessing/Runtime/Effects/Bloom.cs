@@ -1,3 +1,5 @@
+//#define TWO_PASSES
+#define COMBINE
 using System;
 using UnityEngine.Serialization;
 
@@ -67,13 +69,6 @@ namespace UnityEngine.Rendering.PostProcessing
         public ColorParameter color = new ColorParameter { value = Color.white };
 
         /// <summary>
-        /// Boost performances by lowering the effect quality.
-        /// </summary>
-        [FormerlySerializedAs("mobileOptimized")]
-        [Tooltip("Boost performance by lowering the effect quality. This settings is meant to be used on mobile and other low-end platforms but can also provide a nice performance boost on desktops and consoles.")]
-        public BoolParameter fastMode = new BoolParameter { value = false };
-
-        /// <summary>
         /// The dirtiness texture to add smudges or dust to the lens.
         /// </summary>
         [Tooltip("The lens dirt texture used to add smudges or dust to the bloom effect."), DisplayName("Texture")]
@@ -102,29 +97,35 @@ namespace UnityEngine.Rendering.PostProcessing
     {
         enum Pass
         {
-            Prefilter13,
             Prefilter4,
-            Downsample13,
             Downsample4,
-            UpsampleTent,
             UpsampleBox,
+            HorizontalBlur,
+            VerticalBlur,
             DebugOverlayThreshold,
-            DebugOverlayTent,
-            DebugOverlayBox
+            DebugOverlayBox,
+            Prefilter
         }
-
+#if TWO_PASSES
+        int pre;
+        int tmp;
+#else
         // [down,up]
         Level[] m_Pyramid;
         const int k_MaxPyramidSize = 16; // Just to make sure we handle 64k screens... Future-proof!
-
         struct Level
         {
             internal int down;
             internal int up;
         }
+#endif
 
         public override void Init()
         {
+#if TWO_PASSES
+            pre = Shader.PropertyToID("_pre");
+            tmp = Shader.PropertyToID("_tmp");
+#else
             m_Pyramid = new Level[k_MaxPyramidSize];
 
             for (int i = 0; i < k_MaxPyramidSize; i++)
@@ -135,6 +136,7 @@ namespace UnityEngine.Rendering.PostProcessing
                     up = Shader.PropertyToID("_BloomMipUp" + i)
                 };
             }
+#endif
         }
 
         public override void Render(PostProcessRenderContext context)
@@ -150,20 +152,18 @@ namespace UnityEngine.Rendering.PostProcessing
             // Negative anamorphic ratio values distort vertically - positive is horizontal
             float ratio = Mathf.Clamp(settings.anamorphicRatio, -1, 1);
             float rw = ratio < 0 ? -ratio : 0f;
-            float rh = ratio > 0 ?  ratio : 0f;
+            float rh = ratio > 0 ? ratio : 0f;
 
             // Do bloom on a half-res buffer, full-res doesn't bring much and kills performances on
             // fillrate limited platforms
             int tw = Mathf.FloorToInt(context.screenWidth / (2f - rw));
             int th = Mathf.FloorToInt(context.screenHeight / (2f - rh));
-            bool singlePassDoubleWide = (context.stereoActive && (context.stereoRenderingMode == PostProcessRenderContext.StereoRenderingMode.SinglePass) && (context.camera.stereoTargetEye == StereoTargetEyeMask.Both));
-            int tw_stereo = singlePassDoubleWide ? tw * 2 : tw; 
 
             // Determine the iteration count
             int s = Mathf.Max(tw, th);
             float logs = Mathf.Log(s, 2f) + Mathf.Min(settings.diffusion.value, 10f) - 10f;
-            int logs_i = Mathf.FloorToInt(logs); 
-            int iterations = Mathf.Clamp(logs_i, 1, k_MaxPyramidSize);
+            int logs_i = Mathf.FloorToInt(logs);
+            //int iterations = Mathf.Clamp(logs_i, 1, k_MaxPyramidSize);
             float sampleScale = 0.5f + logs - logs_i;
             sheet.properties.SetFloat(ShaderIDs.SampleScale, sampleScale);
 
@@ -175,53 +175,68 @@ namespace UnityEngine.Rendering.PostProcessing
             float lclamp = Mathf.GammaToLinearSpace(settings.clamp.value);
             sheet.properties.SetVector(ShaderIDs.Params, new Vector4(lclamp, 0f, 0f, 0f));
 
-            int qualityOffset = settings.fastMode ? 1 : 0;
+            var linearColor = settings.color.value.linear;
+            float intensity = RuntimeUtilities.Exp2(settings.intensity.value / 10f) - 1f;
 
+#if TWO_PASSES
+            context.GetScreenSpaceTemporaryRT(cmd, pre, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw, th);
+            context.GetScreenSpaceTemporaryRT(cmd, tmp, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw, th);
+            cmd.BlitFullscreenTriangle(context.source, pre, sheet, (int)Pass.Prefilter4);
+
+            cmd.BlitFullscreenTriangle(pre, tmp, sheet, (int)Pass.HorizontalBlur);
+            cmd.BlitFullscreenTriangle(tmp, pre, sheet, (int)Pass.VerticalBlur);
+            var shaderSettings = new Vector4(sampleScale, intensity, settings.dirtIntensity.value, 0);
+#else
+            int iterations = Mathf.Clamp(logs_i, 1, k_MaxPyramidSize);
             // Downsample
             var lastDown = context.source;
             for (int i = 0; i < iterations; i++)
             {
+                cmd.BeginSample("BloomPyramidDown");
+
                 int mipDown = m_Pyramid[i].down;
                 int mipUp = m_Pyramid[i].up;
                 int pass = i == 0
-                    ? (int)Pass.Prefilter13 + qualityOffset
-                    : (int)Pass.Downsample13 + qualityOffset;
+                    ? (int)Pass.Prefilter4
+                    : (int)Pass.Downsample4;
 
-                context.GetScreenSpaceTemporaryRT(cmd, mipDown, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw_stereo, th);
-                context.GetScreenSpaceTemporaryRT(cmd, mipUp, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw_stereo, th);
+                context.GetScreenSpaceTemporaryRT(cmd, mipDown, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw, th);
+                context.GetScreenSpaceTemporaryRT(cmd, mipUp, 0, context.sourceFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, tw, th);
                 cmd.BlitFullscreenTriangle(lastDown, mipDown, sheet, pass);
 
                 lastDown = mipDown;
-                tw_stereo = (singlePassDoubleWide && ((tw_stereo / 2) % 2 > 0)) ? 1 + tw_stereo / 2 : tw_stereo / 2;
-                tw_stereo = Mathf.Max(tw_stereo, 1);
+                tw = Mathf.Max(tw / 2, 1);
                 th = Mathf.Max(th / 2, 1);
+
+                cmd.EndSample("BloomPyramidDown");
             }
 
             // Upsample
             int lastUp = m_Pyramid[iterations - 1].down;
             for (int i = iterations - 2; i >= 0; i--)
             {
+                cmd.BeginSample("BloomPyramidUp");
+
                 int mipDown = m_Pyramid[i].down;
                 int mipUp = m_Pyramid[i].up;
                 cmd.SetGlobalTexture(ShaderIDs.BloomTex, mipDown);
-                cmd.BlitFullscreenTriangle(lastUp, mipUp, sheet, (int)Pass.UpsampleTent + qualityOffset);
+                cmd.BlitFullscreenTriangle(lastUp, mipUp, sheet, (int)Pass.UpsampleBox);
                 lastUp = mipUp;
-            }
 
-            var linearColor = settings.color.value.linear;
-            float intensity = RuntimeUtilities.Exp2(settings.intensity.value / 10f) - 1f;
+                cmd.EndSample("BloomPyramidUp");
+            }
             var shaderSettings = new Vector4(sampleScale, intensity, settings.dirtIntensity.value, iterations);
-
-            // Debug overlays
-            if (context.IsDebugOverlayEnabled(DebugOverlay.BloomThreshold))
-            {
-                context.PushDebugOverlay(cmd, context.source, sheet, (int)Pass.DebugOverlayThreshold);
-            }
-            else if (context.IsDebugOverlayEnabled(DebugOverlay.BloomBuffer))
-            {
-                sheet.properties.SetVector(ShaderIDs.ColorIntensity, new Vector4(linearColor.r, linearColor.g, linearColor.b, intensity));
-                context.PushDebugOverlay(cmd, m_Pyramid[0].up, sheet, (int)Pass.DebugOverlayTent + qualityOffset);
-            }
+#endif
+            //// Debug overlays
+            //if (context.IsDebugOverlayEnabled(DebugOverlay.BloomThreshold))
+            //{
+            //    context.PushDebugOverlay(cmd, context.source, sheet, (int)Pass.DebugOverlayThreshold);
+            //}
+            //else if (context.IsDebugOverlayEnabled(DebugOverlay.BloomBuffer))
+            //{
+            //    sheet.properties.SetVector(ShaderIDs.ColorIntensity, new Vector4(linearColor.r, linearColor.g, linearColor.b, intensity));
+            //    context.PushDebugOverlay(cmd, m_Pyramid[0].up, sheet, (int)Pass.DebugOverlayBox);
+            //}
 
             // Lens dirtiness
             // Keep the aspect ratio correct & center the dirt texture, we don't want it to be
@@ -247,17 +262,22 @@ namespace UnityEngine.Rendering.PostProcessing
 
             // Shader properties
             var uberSheet = context.uberSheet;
-            if (settings.fastMode)
-                uberSheet.EnableKeyword("BLOOM_LOW");
-            else
-                uberSheet.EnableKeyword("BLOOM");
+            uberSheet.EnableKeyword("BLOOM_LOW");
             uberSheet.properties.SetVector(ShaderIDs.Bloom_DirtTileOffset, dirtTileOffset);
             uberSheet.properties.SetVector(ShaderIDs.Bloom_Settings, shaderSettings);
             uberSheet.properties.SetColor(ShaderIDs.Bloom_Color, linearColor);
             uberSheet.properties.SetTexture(ShaderIDs.Bloom_DirtTex, dirtTexture);
+#if TWO_PASSES
+            cmd.SetGlobalTexture(ShaderIDs.BloomTex, pre);
+#else
             cmd.SetGlobalTexture(ShaderIDs.BloomTex, lastUp);
+#endif
 
             // Cleanup
+#if TWO_PASSES
+            cmd.ReleaseTemporaryRT(pre);
+            cmd.ReleaseTemporaryRT(tmp);
+#else
             for (int i = 0; i < iterations; i++)
             {
                 if (m_Pyramid[i].down != lastUp)
@@ -265,10 +285,14 @@ namespace UnityEngine.Rendering.PostProcessing
                 if (m_Pyramid[i].up != lastUp)
                     cmd.ReleaseTemporaryRT(m_Pyramid[i].up);
             }
+#endif
 
             cmd.EndSample("BloomPyramid");
 
-            context.bloomBufferNameID = lastUp;
+#if TWO_PASSES
+            context.bloomBufferNameID = pre;
+#else
+#endif
         }
     }
 }

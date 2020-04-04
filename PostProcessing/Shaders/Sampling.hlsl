@@ -88,4 +88,34 @@ half4 UpsampleBox(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 texelSize, 
     return s * (1.0 / 4.0);
 }
 
+// Horizontal box filtering
+half4 HorizontalBlur(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 texelSize)
+{
+	float2 offset = float2(texelSize.x, 0);
+
+	half4 s;
+	s = (SAMPLE_TEXTURE2D(tex, samplerTex, uv));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv + offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv - offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv + 2 * offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv - 2 * offset));
+
+	return s * 0.2;
+}
+
+// Vertical box filtering
+half4 VerticalBlur(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 texelSize)
+{
+	float2 offset = float2(0, texelSize.y);
+
+	half4 s;
+	s = (SAMPLE_TEXTURE2D(tex, samplerTex, uv));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv + offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv - offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv + 2 * offset));
+	s += (SAMPLE_TEXTURE2D(tex, samplerTex, uv - 2 * offset));
+
+	return s * 0.2;
+}
+
 #endif // UNITY_POSTFX_SAMPLING

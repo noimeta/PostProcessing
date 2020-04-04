@@ -12,7 +12,6 @@ namespace UnityEditor.Rendering.PostProcessing
         SerializedParameterOverride m_Diffusion;
         SerializedParameterOverride m_AnamorphicRatio;
         SerializedParameterOverride m_Color;
-        SerializedParameterOverride m_FastMode;
 
         SerializedParameterOverride m_DirtTexture;
         SerializedParameterOverride m_DirtIntensity;
@@ -26,7 +25,6 @@ namespace UnityEditor.Rendering.PostProcessing
             m_Diffusion = FindParameterOverride(x => x.diffusion);
             m_AnamorphicRatio = FindParameterOverride(x => x.anamorphicRatio);
             m_Color = FindParameterOverride(x => x.color);
-            m_FastMode = FindParameterOverride(x => x.fastMode);
 
             m_DirtTexture = FindParameterOverride(x => x.dirtTexture);
             m_DirtIntensity = FindParameterOverride(x => x.dirtIntensity);
@@ -43,10 +41,6 @@ namespace UnityEditor.Rendering.PostProcessing
             PropertyField(m_Diffusion);
             PropertyField(m_AnamorphicRatio);
             PropertyField(m_Color);
-            PropertyField(m_FastMode);
-
-            if (m_FastMode.overrideState.boolValue && !m_FastMode.value.boolValue && EditorUtilities.isTargetingConsolesOrMobiles)
-                EditorGUILayout.HelpBox("For performance reasons it is recommended to use Fast Mode on mobile and console platforms.", MessageType.Warning);
 
             EditorGUILayout.Space();
             EditorUtilities.DrawHeaderLabel("Dirtiness");

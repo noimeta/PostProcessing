@@ -1,4 +1,4 @@
-Shader "Hidden/PostProcessing/Bloom"
+Shader "Hidden/PostProcessing/CustomBloom"
 {
     HLSLINCLUDE
         
@@ -14,7 +14,59 @@ Shader "Hidden/PostProcessing/Bloom"
         float  _SampleScale;
         float4 _ColorIntensity;
         float4 _Threshold; // x: threshold value (linear), y: threshold - knee, z: knee * 2, w: 0.25 / knee
+		float  _Bluriness;
         float4 _Params; // x: clamp, yzw: unused
+
+		struct VaryingsForBlur
+		{
+			float4 vertex : SV_POSITION;
+			float2 texcoord : TEXCOORD0;
+			float4 lower : TEXCOORD1;
+			float4 upper : TEXCOORD2;
+		};
+
+		VaryingsDefault VertDefault(AttributesDefault v)
+		{
+			VaryingsDefault o;
+			o.vertex = float4(v.vertex.xy, 0.0, 1.0);
+			o.texcoord = TransformTriangleVertexToUV(v.vertex.xy);
+			o.texcoord = o.texcoord * float2(1.0, -1.0) + float2(0.0, 1.0);
+			return o;
+		}
+
+		VaryingsForBlur VertForBlur(AttributesDefault v)
+		{
+			VaryingsDefault o;
+			o.vertex = float4(v.vertex.xy, 0.0, 1.0);
+			o.texcoord = TransformTriangleVertexToUV(v.vertex.xy);
+			o.texcoord = o.texcoord * float2(1.0, -1.0) + float2(0.0, 1.0);
+
+			float4 offset = _MainTex_TexelSize.xyxy * float2(-_Bluriness, _Bluriness).xxyy;
+			o.lower = o.texcoord.xyxy + offset.xyzy;
+			o.upper = o.texcoord.xyxy + offset.xwzw;
+			return o;
+		}
+
+		half4 FragPreFilter(VaryingsForBlur i) : SV_Target
+		{
+			half4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.lower.xy);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.lower.zw);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.upper.xy);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.upper.zw);
+			color = QuadraticThreshold(color, _Threshold.x, _Threshold.yzw);
+			return color;
+		}
+
+		half4 FragBlur(VaryingsForBlur i) : SV_Target
+		{
+			half4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.lower.xy);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.lower.zw);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.upper.xy);
+			color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.upper.zw);
+			return color * 0.2;
+		}
 
         // ----------------------------------------------------------------------------------------
         // Prefilter
@@ -76,113 +128,32 @@ Shader "Hidden/PostProcessing/Bloom"
             return Combine(bloom, i.texcoordStereo);
         }
 
-        // ----------------------------------------------------------------------------------------
-        // Debug overlays
-
-        half4 FragDebugOverlayThreshold(VaryingsDefault i) : SV_Target
-        {
-            half4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoordStereo);
-            return half4(Prefilter(SafeHDR(color), i.texcoord).rgb, 1.0);
-        }
-
-        half4 FragDebugOverlayBox(VaryingsDefault i) : SV_Target
-        {
-            half4 bloom = UpsampleBox(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, UnityStereoAdjustedTexelSize(_MainTex_TexelSize).xy, _SampleScale);
-            return half4(bloom.rgb * _ColorIntensity.w * _ColorIntensity.rgb, 1.0);
-        }
-
     ENDHLSL
 
     SubShader
     {
         Cull Off ZWrite Off ZTest Always
 
-        // 0: Prefilter 4 taps
+        // 0: Prefilter with blur
         Pass
         {
             HLSLPROGRAM
 
-                #pragma vertex VertDefault
-                #pragma fragment FragPrefilter4
+                #pragma vertex VertForBlur
+                #pragma fragment FragPrefilter
 
             ENDHLSL
         }
 
-        // 1: Downsample 4 taps
+        // 1: Blur pass
         Pass
         {
             HLSLPROGRAM
 
-                #pragma vertex VertDefault
-                #pragma fragment FragDownsample4
+                #pragma vertex VertForBlur
+                #pragma fragment FragBlur
 
             ENDHLSL
         }
-
-        // 2: Upsample box filter
-        Pass
-        {
-            HLSLPROGRAM
-
-                #pragma vertex VertDefault
-                #pragma fragment FragUpsampleBox
-
-            ENDHLSL
-        }
-
-		// 3: Horizontal box filter
-		Pass
-		{
-			HLSLPROGRAM
-
-				#pragma vertex VertDefault
-				#pragma fragment FragHorizontalBlur
-
-			ENDHLSL
-		}
-
-		// 4: Vertical box filter
-		Pass
-		{
-			HLSLPROGRAM
-
-				#pragma vertex VertDefault
-				#pragma fragment FragVerticalBlur
-
-			ENDHLSL
-		}
-
-        // 5: Debug overlay (threshold)
-        Pass
-        {
-            HLSLPROGRAM
-
-                #pragma vertex VertDefault
-                #pragma fragment FragDebugOverlayThreshold
-
-            ENDHLSL
-        }
-
-        // 6: Debug overlay (box filter)
-        Pass
-        {
-            HLSLPROGRAM
-
-                #pragma vertex VertDefault
-                #pragma fragment FragDebugOverlayBox
-
-            ENDHLSL
-        }
-
-		// 7: prefilter
-		Pass
-		{
-			HLSLPROGRAM
-
-				#pragma vertex VertDefault
-				#pragma fragment FragPrefilter
-
-			ENDHLSL
-		}
     }
 }

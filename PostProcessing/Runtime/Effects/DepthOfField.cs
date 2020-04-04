@@ -188,11 +188,15 @@ namespace UnityEngine.Rendering.PostProcessing
             sheet.properties.SetFloat(ShaderIDs.RcpAspect, 1f / aspect);
 
             var cmd = context.command;
-            cmd.BeginSample("DepthOfField");
+            //cmd.BeginSample("DepthOfField");
+
+            cmd.BeginSample("DepthOfFieldCoC");
 
             // CoC calculation pass
             context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.CoCTex, 0, cocFormat, RenderTextureReadWrite.Linear);
             cmd.BlitFullscreenTriangle(BuiltinRenderTextureType.None, ShaderIDs.CoCTex, sheet, (int)Pass.CoCCalculation);
+
+            cmd.EndSample("DepthOfFieldCoC");
 
             // CoC temporal filter pass when TAA is enabled
             if (context.IsTemporalAntialiasingActive())
@@ -213,30 +217,46 @@ namespace UnityEngine.Rendering.PostProcessing
                 cmd.SetGlobalTexture(ShaderIDs.CoCTex, historyWrite);
             }
 
+            cmd.BeginSample("DepthOfFieldDownsampling");
+
             // Downsampling and prefiltering pass
             context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTex, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
             cmd.BlitFullscreenTriangle(context.source, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.DownsampleAndPrefilter);
+
+            cmd.EndSample("DepthOfFieldDownsampling");
+
+            cmd.BeginSample("DepthOfFieldBokeh");
 
             // Bokeh simulation pass
             context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTemp, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
             cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTex, ShaderIDs.DepthOfFieldTemp, sheet, (int)Pass.BokehSmallKernel + (int)settings.kernelSize.value);
 
+            cmd.EndSample("DepthOfFieldBokeh");
+
+            cmd.BeginSample("DepthOfFieldPostFilter");
+
             // Postfilter pass
             cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.PostFilter);
             cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTemp);
+
+            cmd.EndSample("DepthOfFieldPostFilter");
 
             // Debug overlay pass
             if (context.IsDebugOverlayEnabled(DebugOverlay.DepthOfField))
                 context.PushDebugOverlay(cmd, context.source, sheet, (int)Pass.DebugOverlay);
 
+            cmd.BeginSample("DepthOfFieldCombine");
+
             // Combine pass
             cmd.BlitFullscreenTriangle(context.source, context.destination, sheet, (int)Pass.Combine);
             cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTex);
 
+            cmd.EndSample("DepthOfFieldCombine");
+
             if (!context.IsTemporalAntialiasingActive())
                 cmd.ReleaseTemporaryRT(ShaderIDs.CoCTex);
 
-            cmd.EndSample("DepthOfField");
+            //cmd.EndSample("DepthOfField");
 
             m_ResetHistory = false;
         }
