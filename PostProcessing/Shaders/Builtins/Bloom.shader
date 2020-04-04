@@ -8,42 +8,55 @@ Shader "Hidden/PostProcessing/Bloom"
 
         TEXTURE2D_SAMPLER2D(_MainTex, sampler_MainTex);
         TEXTURE2D_SAMPLER2D(_BloomTex, sampler_BloomTex);
-        TEXTURE2D_SAMPLER2D(_AutoExposureTex, sampler_AutoExposureTex);
 
         float4 _MainTex_TexelSize;
-        float  _SampleScale;
-        float4 _ColorIntensity;
         float4 _Threshold; // x: threshold value (linear), y: threshold - knee, z: knee * 2, w: 0.25 / knee
-        float4 _Params; // x: clamp, yzw: unused
+		float  _SampleScale;
+		
+		struct VaryingsSimple
+		{
+			float4 vertex : SV_POSITION;
+			float2 texcoord : TEXCOORD0;
+		};
+
+		
+		VaryingsSimple VertSimple(AttributesDefault v)
+		{
+			VaryingsSimple o;
+			o.vertex = float4(v.vertex.xy, 0.0, 1.0);
+			o.texcoord = 0.5 * float2(v.vertex.x + 1, 1 - v.vertex.y);
+			return o;
+		}
 
         // ----------------------------------------------------------------------------------------
         // Prefilter
 
-        half4 Prefilter(half4 color, float2 uv)
+        half4 Prefilter(half4 color)
         {
-           return QuadraticThreshold(color, _Threshold.x, _Threshold.yzw);
+			//return color - _Threshold.xxxx;
+			return QuadraticThreshold(color, _Threshold.x, _Threshold.yzw);
         }
 
-        half4 FragPrefilter(VaryingsDefault i) : SV_Target
+        half4 FragPrefilter(VaryingsSimple i) : SV_Target
         {
-            half4 color = DownsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0);
-            return Prefilter(SafeHDR(color), i.texcoord);
+            half4 color = DownsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0, _SampleScale);
+            return Prefilter(SafeHDR(color));
         }
 
         // ----------------------------------------------------------------------------------------
         // Downsample
 
-        half4 FragDownsample(VaryingsDefault i) : SV_Target
+        half4 FragDownsample(VaryingsSimple i) : SV_Target
         {
-            return DownsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0);
+            return DownsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0, _SampleScale);
         }
 
         // ----------------------------------------------------------------------------------------
         // Upsample
 
-        half4 FragUpsample(VaryingsDefault i) : SV_Target
+        half4 FragUpsample(VaryingsSimple i) : SV_Target
         {
-			return UpsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0);
+			return UpsampleDual(TEXTURE2D_PARAM(_MainTex, sampler_MainTex), i.texcoord, _MainTex_TexelSize.xy / 2.0, _SampleScale);
         }
 
     ENDHLSL
@@ -57,7 +70,7 @@ Shader "Hidden/PostProcessing/Bloom"
         {
             HLSLPROGRAM
 
-                #pragma vertex VertDefault
+                #pragma vertex VertSimple
                 #pragma fragment FragPrefilter
 
             ENDHLSL
@@ -68,7 +81,7 @@ Shader "Hidden/PostProcessing/Bloom"
         {
             HLSLPROGRAM
 
-                #pragma vertex VertDefault
+                #pragma vertex VertSimple
                 #pragma fragment FragDownsample
 
             ENDHLSL
@@ -79,7 +92,7 @@ Shader "Hidden/PostProcessing/Bloom"
         {
             HLSLPROGRAM
 
-                #pragma vertex VertDefault
+                #pragma vertex VertSimple
                 #pragma fragment FragUpsample
 
             ENDHLSL

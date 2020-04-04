@@ -88,26 +88,26 @@ half4 UpsampleBox(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 texelSize, 
     return s * (1.0 / 4.0);
 }
 
-half4 DownsampleDual(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 halfpixel)
+half4 DownsampleDual(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 halfpixel, float offsetscale)
 {
 	half4 sum = SAMPLE_TEXTURE2D(tex, samplerTex, uv) * 4.0;
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv - halfpixel.xy);
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + halfpixel.xy);
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, -halfpixel.y));
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv - float2(halfpixel.x, -halfpixel.y));
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv - halfpixel.xy * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + halfpixel.xy * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, -halfpixel.y) * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv - float2(halfpixel.x, -halfpixel.y) * offsetscale);
 	return sum / 8.0;
 }
 
-half4 UpsampleDual(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 halfpixel)
+half4 UpsampleDual(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 halfpixel, float offsetscale)
 {
-	half4 sum = SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x * 2.0, 0.0));
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x, halfpixel.y)) * 2.0;
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(0.0, halfpixel.y * 2.0));
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, halfpixel.y)) * 2.0;
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x * 2.0, 0.0));
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, -halfpixel.y)) * 2.0;
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(0.0, -halfpixel.y * 2.0));
-	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x, -halfpixel.y)) * 2.0;
+	half4 sum = SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x * 2.0, 0.0) * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x, halfpixel.y) * offsetscale) * 2.0;
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(0.0, halfpixel.y * 2.0) * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, halfpixel.y) * offsetscale) * 2.0;
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x * 2.0, 0.0) * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(halfpixel.x, -halfpixel.y) * offsetscale) * 2.0;
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(0.0, -halfpixel.y * 2.0) * offsetscale);
+	sum += SAMPLE_TEXTURE2D(tex, samplerTex, uv + float2(-halfpixel.x, -halfpixel.y) * offsetscale) * 2.0;
 	return sum / 12.0;
 }
 

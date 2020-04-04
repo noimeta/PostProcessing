@@ -150,7 +150,7 @@ Shader "Hidden/PostProcessing/Uber"
                 #if BLOOM
                 half4 bloom = UpsampleTent(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy, _Bloom_Settings.x);
                 #else
-                half4 bloom = UpsampleDual(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy / 2.0);
+                half4 bloom = UpsampleDual(TEXTURE2D_PARAM(_BloomTex, sampler_BloomTex), uvDistorted, _BloomTex_TexelSize.xy / 2.0, _Bloom_Settings.x);
                 #endif
 
                 // Additive bloom (artist friendly)

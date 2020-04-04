@@ -34,6 +34,12 @@ namespace UnityEngine.Rendering.PostProcessing
         public IntParameter bluriness = new IntParameter { value = 1 };
 
         /// <summary>
+        /// The sampling offset
+        /// </summary>
+        [Range(1, 4), Tooltip("Offset")]
+        public IntParameter offsetScale = new IntParameter { value = 2 };
+
+        /// <summary>
         /// Returns <c>true</c> if the effect is currently enabled and supported.
         /// </summary>
         /// <param name="context">The current post-processing render context</param>
@@ -96,6 +102,7 @@ namespace UnityEngine.Rendering.PostProcessing
             float knee = lthresh * 0.5f + 1e-5f;
             var threshold = new Vector4(lthresh, lthresh - knee, knee * 2f, 0.25f / knee);
             sheet.properties.SetVector(ShaderIDs.Threshold, threshold);
+            sheet.properties.SetFloat(ShaderIDs.SampleScale, settings.offsetScale.value);
 
             int iterations = settings.bluriness.value + 1;
 
@@ -129,7 +136,7 @@ namespace UnityEngine.Rendering.PostProcessing
                 lastUp = mipUp;
             }
             
-            var shaderSettings = new Vector4(0, settings.intensity.value, 0, iterations);
+            var shaderSettings = new Vector4(settings.offsetScale.value, settings.intensity.value, 0, iterations);
 
             // Shader properties
             var uberSheet = context.uberSheet;
