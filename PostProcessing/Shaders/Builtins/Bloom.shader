@@ -12,21 +12,6 @@ Shader "Hidden/PostProcessing/Bloom"
         float4 _MainTex_TexelSize;
         float4 _Threshold; // x: threshold value (linear), y: threshold - knee, z: knee * 2, w: 0.25 / knee
 		float  _SampleScale;
-		
-		struct VaryingsSimple
-		{
-			float4 vertex : SV_POSITION;
-			float2 texcoord : TEXCOORD0;
-		};
-
-		
-		VaryingsSimple VertSimple(AttributesDefault v)
-		{
-			VaryingsSimple o;
-			o.vertex = float4(v.vertex.xy, 0.0, 1.0);
-			o.texcoord = 0.5 * float2(v.vertex.x + 1, 1 - v.vertex.y);
-			return o;
-		}
 
         // ----------------------------------------------------------------------------------------
         // Prefilter

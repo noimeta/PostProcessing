@@ -279,6 +279,21 @@ struct VaryingsDefault
 float _DepthSlice;
 #endif
 
+struct VaryingsSimple
+{
+	float4 vertex : SV_POSITION;
+	float2 texcoord : TEXCOORD0;
+};
+
+
+VaryingsSimple VertSimple(AttributesDefault v)
+{
+	VaryingsSimple o;
+	o.vertex = float4(v.vertex.xy, 0.0, 1.0);
+	o.texcoord = 0.5 * float2(v.vertex.x + 1, 1 - v.vertex.y);
+	return o;
+}
+
 VaryingsDefault VertDefault(AttributesDefault v)
 {
     VaryingsDefault o;

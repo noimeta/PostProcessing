@@ -189,7 +189,11 @@ namespace UnityEngine.Rendering.PostProcessing
 
             var cmd = context.command;
             cmd.BeginSample("DepthOfField");
-
+            
+            // Downsampling and prefiltering pass
+            context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTemp, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
+            cmd.BlitFullscreenTriangle(context.source, ShaderIDs.DepthOfFieldTemp, sheet, (int)Pass.DownsampleAndPrefilter);
+            
             // CoC calculation pass
             context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.CoCTex, 0, cocFormat, RenderTextureReadWrite.Linear);
             cmd.BlitFullscreenTriangle(BuiltinRenderTextureType.None, ShaderIDs.CoCTex, sheet, (int)Pass.CoCCalculation);
@@ -212,23 +216,19 @@ namespace UnityEngine.Rendering.PostProcessing
                 cmd.ReleaseTemporaryRT(ShaderIDs.CoCTex);
                 cmd.SetGlobalTexture(ShaderIDs.CoCTex, historyWrite);
             }
-
-            // Downsampling and prefiltering pass
-            context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTex, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
-            cmd.BlitFullscreenTriangle(context.source, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.DownsampleAndPrefilter);
-
+            
             // Bokeh simulation pass
-            context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTemp, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
-            cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTex, ShaderIDs.DepthOfFieldTemp, sheet, (int)Pass.BokehSmallKernel + (int)settings.kernelSize.value);
+            context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTex, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
+            cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.BokehSmallKernel + (int)settings.kernelSize.value);
 
-            // Postfilter pass
-            cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.PostFilter);
-            cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTemp);
+            //// Postfilter pass
+            //cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.PostFilter);
+            //cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTemp);
 
             // Debug overlay pass
             if (context.IsDebugOverlayEnabled(DebugOverlay.DepthOfField))
                 context.PushDebugOverlay(cmd, context.source, sheet, (int)Pass.DebugOverlay);
-
+            
             // Combine pass
             cmd.BlitFullscreenTriangle(context.source, context.destination, sheet, (int)Pass.Combine);
             cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTex);
