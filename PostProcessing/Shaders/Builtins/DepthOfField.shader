@@ -97,36 +97,12 @@ Shader "Hidden/PostProcessing/DepthOfField"
 
         Pass // 7
         {
-            Name "Postfilter"
-
-            HLSLPROGRAM
-                #pragma target 3.5
-                #pragma vertex VertDefault
-                #pragma fragment FragPostBlur
-                #include "DepthOfField.hlsl"
-            ENDHLSL
-        }
-
-        Pass // 8
-        {
             Name "Combine"
 
             HLSLPROGRAM
                 #pragma target 3.5
                 #pragma vertex VertDefault
                 #pragma fragment FragCombine
-                #include "DepthOfField.hlsl"
-            ENDHLSL
-        }
-
-        Pass // 9
-        {
-            Name "Debug Overlay"
-
-            HLSLPROGRAM
-                #pragma target 3.5
-                #pragma vertex VertDefault
-                #pragma fragment FragDebugOverlay
                 #include "DepthOfField.hlsl"
             ENDHLSL
         }
@@ -228,36 +204,12 @@ Shader "Hidden/PostProcessing/DepthOfField"
 
         Pass // 7
         {
-            Name "Postfilter"
-
-            HLSLPROGRAM
-                #pragma target 3.5
-                #pragma vertex VertDefault
-                #pragma fragment FragPostBlur
-                #include "DepthOfField.hlsl"
-            ENDHLSL
-        }
-
-        Pass // 8
-        {
             Name "Combine"
 
             HLSLPROGRAM
                 #pragma target 3.5
                 #pragma vertex VertDefault
                 #pragma fragment FragCombine
-                #include "DepthOfField.hlsl"
-            ENDHLSL
-        }
-
-        Pass // 9
-        {
-            Name "Debug Overlay"
-
-            HLSLPROGRAM
-                #pragma target 3.5
-                #pragma vertex VertDefault
-                #pragma fragment FragDebugOverlay
                 #include "DepthOfField.hlsl"
             ENDHLSL
         }

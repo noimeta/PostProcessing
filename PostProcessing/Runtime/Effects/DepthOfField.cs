@@ -94,9 +94,7 @@ namespace UnityEngine.Rendering.PostProcessing
             BokehMediumKernel,
             BokehLargeKernel,
             BokehVeryLargeKernel,
-            PostFilter,
-            Combine,
-            DebugOverlay
+            Combine
         }
 
         // Ping-pong between two history textures as we can't read & write the same target in the
@@ -220,14 +218,6 @@ namespace UnityEngine.Rendering.PostProcessing
             // Bokeh simulation pass
             context.GetScreenSpaceTemporaryRT(cmd, ShaderIDs.DepthOfFieldTex, 0, colorFormat, RenderTextureReadWrite.Default, FilterMode.Bilinear, context.width / 2, context.height / 2);
             cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.BokehSmallKernel + (int)settings.kernelSize.value);
-
-            //// Postfilter pass
-            //cmd.BlitFullscreenTriangle(ShaderIDs.DepthOfFieldTemp, ShaderIDs.DepthOfFieldTex, sheet, (int)Pass.PostFilter);
-            //cmd.ReleaseTemporaryRT(ShaderIDs.DepthOfFieldTemp);
-
-            // Debug overlay pass
-            if (context.IsDebugOverlayEnabled(DebugOverlay.DepthOfField))
-                context.PushDebugOverlay(cmd, context.source, sheet, (int)Pass.DebugOverlay);
             
             // Combine pass
             cmd.BlitFullscreenTriangle(context.source, context.destination, sheet, (int)Pass.Combine);

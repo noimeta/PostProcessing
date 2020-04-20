@@ -203,19 +203,6 @@ half4 FragBlur(VaryingsSimple i) : SV_Target
     return half4(rgb, alpha);
 }
 
-// Postfilter blur
-half4 FragPostBlur(VaryingsSimple i) : SV_Target
-{
-    // 9 tap tent filter with 4 bilinear samples
-    const float4 duv = _MainTex_TexelSize.xyxy * float4(0.5, 0.5, -0.5, 0);
-    half4 acc;
-    acc  = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord - duv.xy);
-    acc += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord - duv.zy);
-    acc += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord + duv.zy);
-    acc += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.texcoord + duv.xy);
-    return acc / 4.0;
-}
-
 half4 Upsample(TEXTURE2D_ARGS(tex, samplerTex), float2 uv, float2 texelSize)
 {
 	const float4 duv = texelSize.xyxy * float4(1.0, 1.0, -1.0, 0);
